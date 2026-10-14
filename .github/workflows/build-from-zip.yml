@@ -1,0 +1,47 @@
+name: Build Android APK
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'hannaford-android-project.zip'
+      - '.github/workflows/build-from-zip.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract project
+        run: |
+          mkdir -p extracted
+          unzip -q hannaford-android-project.zip -d extracted
+          ROOT="$(find extracted -name gradlew -type f -print -quit)"
+          if [ -z "$ROOT" ]; then
+            echo "gradlew not found"
+            exit 1
+          fi
+          echo "PROJECT_DIR=$(dirname "$ROOT")" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Build APK
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDebug
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hannaford-savings-planner-debug-apk
+          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
